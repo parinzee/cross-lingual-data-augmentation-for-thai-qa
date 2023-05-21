@@ -1,4 +1,4 @@
-ai21==1.0.5
+openai==0.27.0
 beautifulsoup4==4.12.2
 datasets==2.12.0
 evaluate==0.4.0
@@ -11,6 +11,7 @@ pyarrow==12.0.0
 pythainlp==4.0.0
 sentencepiece==0.1.99
 seqeval 
+tenacity==8.2.2
 tensorboard==2.12.2
 tensorboard-data-server==0.7.0
 tensorboard-plugin-wit==1.8.1
