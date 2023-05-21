@@ -29,7 +29,7 @@ model = "gpt-3.5-turbo-0301"
 example_grammar_error_correction_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to evaluate each sentence from a given list and correct its grammar. Even if a sentence is not clear or intelligible, ALWAYS make a grammatical correction, even if you have to make assumptions about the intended meaning. If the sentence is grammatically correct, do not change it. Your output should be presented with ONLY each corrected sentence written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to evaluate each sentence from a given list and correct its grammar. Even if a sentence is not clear or intelligible, ALWAYS make a grammatical correction, even if you have to make assumptions about the intended meaning. If the sentence is grammatically correct, do not change it. Your output should include ALL SENTENCES, presented with ONLY each corrected sentence written on a new line.",
     },
     {
         "role": "user",
@@ -83,7 +83,7 @@ def grammar_error_correction():
 
         to_correct = "\n".join(batch["en_aug"].tolist())
         attempt = 0
-        while attempt < 3:
+        while True:
             try:
                 response = completion_with_backoff(
                     model=model,
@@ -97,11 +97,12 @@ def grammar_error_correction():
                 assert len(corrected) == len(batch)
                 break
             except AssertionError:
-                print(f"Error: {raw_corrected}")
-                print(f"Error: {batch}")
+                print(f"Model Returned:\n{raw_corrected}")
+                print(f"Error:\n{batch['en_aug']}")
                 print(f"Attempt {attempt+1} of 3")
                 if attempt == 3:
                     raise
+                attempt += 1
 
         # Add to data
         for idx, corrected_sentence in enumerate(corrected):
@@ -136,7 +137,7 @@ def paraphrase():
 
         to_paraphrase = "\n".join(batch["en_aug"].tolist())
         attempt = 0
-        while attempt < 3:
+        while True:
             try:
                 response = completion_with_backoff(
                     model=model,
@@ -150,11 +151,12 @@ def paraphrase():
                 assert len(paraphrases) == len(batch)
                 break
             except AssertionError:
-                print(f"Error: {raw_paraphrases}")
-                print(f"Error: {batch}")
+                print(f"Model Returned:\n{raw_paraphrases}")
+                print(f"Error:\n{batch['en_aug']}")
                 print(f"Attempt {attempt+1} of 3")
                 if attempt == 3:
                     raise
+                attempt += 1
 
         # Add to data
         for idx, paraphrased in enumerate(paraphrases):
