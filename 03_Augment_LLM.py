@@ -29,7 +29,7 @@ model = "gpt-3.5-turbo-0301"
 example_grammar_error_correction_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to evaluate EACH AND EVERY question from a given list and correct its grammar. Even if a question is incomplete or unintelligible, YOU MUST make a grammatical correction, you can make assumptions about the intended meaning. If the question is grammatically correct, do not change it. Your output should be presented WITH EACH AND EVERY question with ONLY each question written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to evaluate EACH AND EVERY question from a given list and correct its grammar. Even if a question is incomplete or unintelligible, YOU MUST make a grammatical correction, you can make assumptions about the intended meaning. If the question is grammatically correct, do not change it. In the case of duplicate questions, return them IN THE SAME ORDER as presented with no removal. Your output should be presented WITH EACH AND EVERY question with ONLY each question written on a new line.",
     },
     {
         "role": "user",
@@ -44,7 +44,7 @@ example_grammar_error_correction_messages = [
 example_paraphrase_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to perform two specific actions on a given list of questions. First, evaluate each question and make sure it's grammatically correct. If a question is not grammatically correct, fix it. Then, ALWAYS paraphrase each question while maintaining its original meaning. Your output should be presented WITH EACH AND EVERY question with ONLY each paraphrased question written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to perform two specific actions on a given list of questions. First, evaluate each question and make sure it's grammatically correct. If a question is not grammatically correct, fix it. Then, ALWAYS paraphrase each question while maintaining its original meaning.  In the case of duplicate questions, return them IN THE SAME ORDER as presented with no removal. Your output should be presented WITH EACH AND EVERY question with ONLY each paraphrased question written on a new line.",
     },
     {
         "role": "user",
@@ -83,11 +83,10 @@ def grammar_error_correction():
             continue
 
         # Shuffle the rows
-        batch = batch.sample(frac=1).reset_index(drop=True)
-
-        to_correct = "\n".join(batch["en_aug"].tolist())
         attempt = 0
         while True:
+            batch = batch.sample(frac=1).reset_index(drop=True)
+            to_correct = "\n".join(batch["en_aug"].tolist())
             try:
                 response = completion_with_backoff(
                     model=model,
@@ -140,11 +139,10 @@ def paraphrase():
             continue
 
         # Shuffle the rows
-        batch = batch.sample(frac=1).reset_index(drop=True)
-
-        to_paraphrase = "\n".join(batch["en_aug"].tolist())
         attempt = 0
         while True:
+            batch = batch.sample(frac=1).reset_index(drop=True)
+            to_paraphrase = "\n".join(batch["en_aug"].tolist())
             try:
                 response = completion_with_backoff(
                     model=model,
