@@ -29,7 +29,7 @@ model = "gpt-3.5-turbo-0301"
 example_grammar_error_correction_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to evaluate each sentence from a given list and correct its grammar. Even if a sentence is not clear or intelligible, do your best to make a grammatical correction, even if you have to make assumptions about the intended meaning. If the sentence is grammatically correct, do not change it. Your output should be presented with ONLY each corrected sentence written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to evaluate each sentence from a given list and correct its grammar. Even if a sentence is not clear or intelligible, ALWAYS make a grammatical correction, even if you have to make assumptions about the intended meaning. If the sentence is grammatically correct, do not change it. Your output should be presented with ONLY each corrected sentence written on a new line.",
     },
     {
         "role": "user",
@@ -74,9 +74,9 @@ def grammar_error_correction():
         completed_ids = set()
 
     # Loop through each row in the dataframe using batches of 25
-    for i in tqdm.tqdm(range(0, len(df), 25), desc="Correcting grammar"):
+    for i in tqdm.tqdm(range(0, len(df), 15), desc="Correcting grammar"):
         # Get the next 25 rows
-        batch = df.iloc[i : i + 25]
+        batch = df.iloc[i : i + 15]
         batch = batch[~batch["id"].isin(completed_ids)]
         if len(batch) == 0:
             continue
