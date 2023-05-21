@@ -29,7 +29,7 @@ model = "gpt-3.5-turbo-0301"
 example_grammar_error_correction_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to evaluate each sentence from a given list and correct its grammar. Even if a sentence is not clear or intelligible, ALWAYS make a grammatical correction, even if you have to make assumptions about the intended meaning. If the sentence is grammatically correct, do not change it. Your output should include ALL SENTENCES, presented with ONLY each corrected sentence written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to evaluate EACH AND EVERY question from a given list and correct its grammar. Even if a question is incomplete or unintelligible, YOU MUST make a grammatical correction, you can make assumptions about the intended meaning. If the question is grammatically correct, do not change it. Your output should be presented WITH EACH AND EVERY question with ONLY each question written on a new line.",
     },
     {
         "role": "user",
@@ -44,7 +44,7 @@ example_grammar_error_correction_messages = [
 example_paraphrase_messages = [
     {
         "role": "system",
-        "content": "You are a highly skilled language model AI. Your task is to perform two specific actions on a given list of sentences. First, evaluate each sentence and make sure it's grammatically correct. If a sentence is not grammatically correct, fix it. Then, ALWAYS paraphrase each sentence while maintaining its original meaning.  Your output should be presented with ONLY each paraphrased sentence written on a new line.",
+        "content": "You are a highly skilled language model AI. Your task is to perform two specific actions on a given list of questions. First, evaluate each question and make sure it's grammatically correct. If a question is not grammatically correct, fix it. Then, ALWAYS paraphrase each question while maintaining its original meaning. Your output should be presented WITH EACH AND EVERY question with ONLY each paraphrased question written on a new line.",
     },
     {
         "role": "user",
@@ -73,13 +73,17 @@ def grammar_error_correction():
         data = []
         completed_ids = set()
 
-    # Loop through each row in the dataframe using batches of 25
+    # Loop through each row in the dataframe using batches of 15
     for i in tqdm.tqdm(range(0, len(df), 15), desc="Correcting grammar"):
         # Get the next 25 rows
-        batch = df.iloc[i : i + 15]
+        batch = df.iloc[i : i + 15].copy()
         batch = batch[~batch["id"].isin(completed_ids)]
+
         if len(batch) == 0:
             continue
+
+        # Shuffle the rows
+        batch = batch.sample(frac=1).reset_index(drop=True)
 
         to_correct = "\n".join(batch["en_aug"].tolist())
         attempt = 0
@@ -94,13 +98,14 @@ def grammar_error_correction():
                 )
                 raw_corrected = response["choices"][0]["message"]["content"]
                 corrected = raw_corrected.split("\n")
+                corrected = [x.strip() for x in corrected if x.strip() != ""]
                 assert len(corrected) == len(batch)
                 break
             except AssertionError:
                 print(f"Model Returned:\n{raw_corrected}")
-                print(f"Error:\n{batch['en_aug']}")
-                print(f"Attempt {attempt+1} of 3")
-                if attempt == 3:
+                print(f"Error:\n{batch['en_aug'].to_list()}")
+                print(f"Attempt {attempt+1} of 6")
+                if attempt == 6:
                     raise
                 attempt += 1
 
@@ -127,13 +132,15 @@ def paraphrase():
         data = []
         completed_ids = set()
 
-    # Loop through each row in the dataframe using batches of 25
-    for i in tqdm.tqdm(range(0, len(df), 25), desc="Paraphrasing questions"):
-        # Get the next 25 rows
-        batch = df.iloc[i : i + 25]
+    # Loop through each row in the dataframe using batches of 15 
+    for i in tqdm.tqdm(range(0, len(df), 15), desc="Paraphrasing questions"):
+        batch = df.iloc[i : i + 15]
         batch = batch[~batch["id"].isin(completed_ids)]
         if len(batch) == 0:
             continue
+
+        # Shuffle the rows
+        batch = batch.sample(frac=1).reset_index(drop=True)
 
         to_paraphrase = "\n".join(batch["en_aug"].tolist())
         attempt = 0
@@ -148,13 +155,14 @@ def paraphrase():
                 )
                 raw_paraphrases = response["choices"][0]["message"]["content"]
                 paraphrases = raw_paraphrases.split("\n")
+                paraphrases = [x.strip() for x in paraphrases if x.strip() != ""]
                 assert len(paraphrases) == len(batch)
                 break
             except AssertionError:
                 print(f"Model Returned:\n{raw_paraphrases}")
-                print(f"Error:\n{batch['en_aug']}")
-                print(f"Attempt {attempt+1} of 3")
-                if attempt == 3:
+                print(f"Error:\n{batch['en_aug'].to_list()}")
+                print(f"Attempt {attempt+1} of 6")
+                if attempt == 6:
                     raise
                 attempt += 1
 
