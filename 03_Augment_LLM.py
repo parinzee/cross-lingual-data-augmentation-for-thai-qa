@@ -183,3 +183,18 @@ if __name__ == "__main__":
     # Wait for both threads to finish
     thread_1.join()
     thread_2.join()
+
+    # Merge the data from both threads
+    gec = pd.read_csv("data/03_augment_llm_gec.csv")
+    paraphrase = pd.read_csv("data/03_augment_llm_paraphrase.csv")
+    merge = pd.merge(gec, paraphrase, on="id")
+    final = pd.merge(df, merge, on="id")
+    
+    # Sanity check that rows were not lost
+    assert len(gec) == len(paraphrase)
+    assert len(gec) == len(merge)
+    assert len(gec) == len(final)
+    assert len(final) == len(df)
+
+    # Save the data
+    final.to_csv("data/03_augment_llm.csv", index=False)
