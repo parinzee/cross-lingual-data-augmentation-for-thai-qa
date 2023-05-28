@@ -1,6 +1,12 @@
 import re
 from bs4 import BeautifulSoup
 from pythainlp.util import normalize
+import os
+import psutil
+import signal
+import time
+import multiprocessing
+
 
 def clean_text(text, is_question=False):
     # Remove html tags
@@ -40,3 +46,22 @@ def clean_text(text, is_question=False):
     text = normalize(text)
 
     return text
+
+
+def _monitor_memory(main_pid, threshold):
+    while True:
+        main_process = psutil.Process(main_pid)
+        memory_usage = main_process.memory_info().rss
+        total_memory = psutil.virtual_memory().total
+
+        if memory_usage > total_memory * threshold:
+            os.kill(main_pid, signal.SIGTERM)
+            exit(-1)
+
+        time.sleep(0.01)
+
+def monitor_memory(threshold):
+    main_pid = os.getpid()
+    memory_monitor = multiprocessing.Process(target=_monitor_memory, args=(main_pid, threshold))
+    memory_monitor.start()
+    return memory_monitor
