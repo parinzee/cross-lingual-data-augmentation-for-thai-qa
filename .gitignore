@@ -1,4 +1,12 @@
 .DS_STORE
+
+# Models
+student_best_supported_languages*
+*.vec
+*.zip
+*.bin
+*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
