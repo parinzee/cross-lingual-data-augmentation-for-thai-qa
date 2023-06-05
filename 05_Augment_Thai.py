@@ -90,9 +90,8 @@ if __name__ == "__main__":
         os.system('curl -O https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.th.300.vec.gz')
         os.system('gunzip cc.th.300.vec.gz')
     
-    # fasttext = naw.WordEmbsAug(model_type='fasttext', tokenizer=word_tokenize, reverse_tokenizer=word_detokenize,
-    #                   model_path="cc.th.300.vec")
-    fasttext = None
+    fasttext = naw.WordEmbsAug(model_type='fasttext', tokenizer=word_tokenize, reverse_tokenizer=word_detokenize,
+                      model_path="cc.th.300.vec")
     fasttext_aug = augment(dataset, lambda x: fasttext.augment(x, n=1), 'th_fasttext_aug', clean_every=100)
 
     # Merge all augmented data
