@@ -6,6 +6,10 @@ import psutil
 import signal
 import time
 import multiprocessing
+from functools import lru_cache
+from tqdm.auto import tqdm
+import numpy as np
+
 
 
 def clean_text(text, is_question=False):
@@ -65,3 +69,47 @@ def monitor_memory(threshold):
     memory_monitor = multiprocessing.Process(target=_monitor_memory, args=(main_pid, threshold))
     memory_monitor.start()
     return memory_monitor
+
+# define global cache dictionaries
+cache_whole_texts = {}
+cache_batches = {}
+
+def encode_in_batch(model, texts):
+    # cache for whole texts
+    texts_tuple = tuple(texts) # since lists can't be dict keys
+    if texts_tuple in cache_whole_texts:
+        return cache_whole_texts[texts_tuple]
+
+    batch_size = 2048
+    all_embeddings = []
+
+    for i in tqdm(range(0, len(texts), batch_size)):
+        batch_texts = texts[i:i+batch_size]
+        # cache for batches
+        batch_tuple = tuple(batch_texts)
+        if batch_tuple in cache_batches:
+            embeddings = cache_batches[batch_tuple]
+        else:
+            embeddings = cache_individual_texts(model, *batch_texts)
+            cache_batches[batch_tuple] = np.asarray(embeddings)
+        all_embeddings.append(embeddings)
+    
+    all_embeddings = np.concatenate(all_embeddings, axis=0)
+
+    # save to whole texts cache
+    cache_whole_texts[texts_tuple] = all_embeddings
+
+    return all_embeddings
+
+@lru_cache(maxsize=None) # cache for individual texts
+def cache_individual_texts(model, *batch_texts):
+    batch_texts = list(batch_texts)
+    for item in batch_texts:
+        try:
+            assert type(item) == str
+        except:
+            print(item)
+            raise
+    embeddings = model(list(batch_texts))
+    return embeddings
+    
