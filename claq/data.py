@@ -10,7 +10,6 @@ from pythainlp.util import normalize
 from datasets import load_dataset as hf_load_dataset, concatenate_datasets
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 def clean_text(text, is_question=False):
     # Remove html tags

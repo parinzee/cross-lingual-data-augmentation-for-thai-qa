@@ -18,6 +18,10 @@ tqdm = "^4.65.0"
 beautifulsoup4 = "^4.12.2"
 pythainlp = "^4.0.2"
 lxml = "^4.9.2"
+torch = "^2.0.1"
+transformers = "^4.30.1"
+sentencepiece = "^0.1.99"
+sacremoses = "^0.0.53"
 
 
 [build-system]
