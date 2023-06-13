@@ -5,8 +5,19 @@ description = "Cross-lingual Data Augmentation for Question Answering in Low Res
 authors = ["Parinthapat Pengpun <parinzee@protonmail.com>"]
 readme = "README.md"
 
+[tool.poetry.scripts]
+claq = "claq.main:app"
+
 [tool.poetry.dependencies]
 python = "^3.10"
+typer = {extras = ["all"], version = "^0.9.0"}
+pandas = "^2.0.2"
+numpy = "^1.24.3"
+datasets = "^2.12.0"
+tqdm = "^4.65.0"
+beautifulsoup4 = "^4.12.2"
+pythainlp = "^4.0.2"
+lxml = "^4.9.2"
 
 
 [build-system]
