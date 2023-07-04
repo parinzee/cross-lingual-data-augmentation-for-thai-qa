@@ -8,7 +8,7 @@ app = typer.Typer()
 
 @app.command()
 def download(force: bool = typer.Option(False)):
-    path = Path("data/original_dataset.csv")
+    path = Path("data/original_dataset.parquet")
     if os.path.exists(path) and not force:
         print(f"[red]{path} already exists. Use --force to overwrite.[/red]")
         raise typer.Exit(1)
@@ -21,4 +21,4 @@ def download(force: bool = typer.Option(False)):
     # Download dataset
     loaded = load_unprocessed_qa_dataset()
     print(f"[green]Saving to {path}...[/green]")
-    loaded.to_csv(path, index=False)
+    loaded.to_parquet(path, index=False)

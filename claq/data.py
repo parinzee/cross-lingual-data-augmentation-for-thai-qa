@@ -158,7 +158,7 @@ def generate_id(row):
     ).hexdigest()
 
 
-def load_unprocessed_qa_dataset():
+def load_unprocessed_qa_dataset() -> pd.DataFrame:
     logger.info("Loading datasets")
     iapp = hf_load_dataset("iapp_wiki_qa_squad")
     thaiqa = hf_load_dataset("thaiqa_squad")
