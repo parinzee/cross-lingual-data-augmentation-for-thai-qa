@@ -1,4 +1,5 @@
 import random
+import warnings
 import numpy as np
 import pandas as pd
 import torch
@@ -17,13 +18,21 @@ import gc
 from datasets import load_metric
 from transformers import (AutoModelForQuestionAnswering, AutoTokenizer,
                           DefaultDataCollator, Trainer, TrainingArguments)
+import argparse
+import os
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false" # Set to false to prevent deadlock
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--from_augment_idx", type=str, default=None, help="Continue from a specific augment index")
+parser.add_argument("--from_augment_ratio", type=float, default=None, help="Continue from a specific augment ratio")
+parser.add_argument("--warnings", action="store_true", help="Enable warnings")
+parser.add_argument("--seed", type=int, default=42, help="Random seed")
+args = parser.parse_args()
 
 wandb.login()
-login()
 
-SEED = 42
+SEED = int(args.seed)
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -76,8 +85,7 @@ def convert_row_to_simple_transformers_format(row, question_col="question"):
 
 # Add None so that the first benchmark only consists of the original questions
 all_augment_cols = [None] + [col for col in dataset.columns if col.startswith('th_')]
-all_augment_cols
-
+print("Augment columns:", all_augment_cols)
 
 def merge_qas(data):
     merged_data = defaultdict(list)
@@ -163,7 +171,7 @@ def get_training_args(exp_name: str):
         learning_rate=2e-5,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=128,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=2,
         num_train_epochs=20,
         warmup_ratio=0.2,
         weight_decay=0.01,
@@ -453,11 +461,26 @@ def train_eval_model(train_set, val_set, test_set, training_args, data_args):
     trainer.push_to_hub()
 
 if __name__ == "__main__":
+
+    if not args.warnings:
+        warnings.filterwarnings("ignore")
+
+    if args.from_augment_idx:
+        print(f"Continuing from {args.from_augment_idx}")
+        all_augment_cols = all_augment_cols[int(args.from_augment_idx):]
+        print(f"New augment columns: {all_augment_cols}")
+
     for col in tqdm(all_augment_cols):
         gc.collect()
         if col:
             for ratio in range(1, 11):
                 ratio = ratio / 10
+
+                # Skip if we are continuing from a specific augment index
+                if args.from_augment_idx and all_augment_cols[0] == col and args.from_augment_ratio:
+                    if float(args.from_augment_ratio) > ratio:
+                        print(f"Skipping {col} {ratio}")
+                        continue
 
                 train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True)
                 training_args, data_args = get_training_args(f"{col}_{ratio}")
