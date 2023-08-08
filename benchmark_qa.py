@@ -37,7 +37,11 @@ dataset["answers"] = dataset["answers"].apply(ast.literal_eval)
 all_augment_cols = [None] + [col for col in dataset.columns if col.startswith('th_')]
 print("Augment columns:", all_augment_cols)
 
-def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False):
+def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False, use_bleu=False, select_cosine_threshold=None):
+    # Check that use_slem and use_bleu are not both True
+    if use_slem and use_bleu:
+        raise ValueError("use_slem and use_bleu cannot both be True.")
+
     if not return_hf:
         # Filter out test_sets
         test_set = dataset[(dataset["source"] == "xquad") | (dataset["source"] == "tydiqa")].apply(convert_row_to_simple_transformers_format, axis=1)
@@ -57,8 +61,15 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False):
             base_col = "_".join(aug_col.split("_")[1:])
 
             sorted_ds = dataset.copy()
+
+            if select_cosine_threshold:
+                # Filter out rows with cosine distance > select_cosine_threshold
+                sorted_ds = sorted_ds[sorted_ds[f"dis_{base_col}"] <= select_cosine_threshold]
+
             if use_slem:
                 sorted_ds = sorted_ds.sort_values(f"slem_{base_col}", ascending=False)
+            elif use_bleu:
+                sorted_ds = sorted_ds.sort_values(f"bleu_{base_col}", ascending=False)
             else:
                 sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
             sorted_ds = sorted_ds[sorted_ds.index.isin(train_set.index)]
@@ -93,8 +104,15 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False):
             base_col = "_".join(aug_col.split("_")[1:])
 
             sorted_ds = dataset.copy()
+
+            if select_cosine_threshold:
+                # Filter out rows with cosine distance > select_cosine_threshold
+                sorted_ds = sorted_ds[sorted_ds[f"dis_{base_col}"] <= select_cosine_threshold]
+
             if use_slem:
                 sorted_ds = sorted_ds.sort_values(f"slem_{base_col}", ascending=False)
+            elif use_bleu:
+                sorted_ds = sorted_ds.sort_values(f"bleu_{base_col}", ascending=False)
             else:
                 sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
             sorted_ds = sorted_ds[sorted_ds.index.isin(train_set.index)]
@@ -105,11 +123,32 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False):
 
         return Dataset.from_pandas(train_set), Dataset.from_pandas(val_set), Dataset.from_pandas(test_set)
 
-def get_training_args(exp_name: str, push_to_hub=True, use_slem=False):
+def get_training_args(exp_name: str, push_to_hub=True, use_slem=False, use_bleu=False, select_cosine_threshold=None):
+    # Check that use_slem and use_bleu are not both True
+    if use_slem and use_bleu:
+        raise ValueError("use_slem and use_bleu cannot both be True.")
+    
+    if select_cosine_threshold:
+        output_dir = f"models/claq-qa-th-wangchanberta-cosine{select_cosine_threshold}-"
+    else:
+        output_dir = "models/claq-qa-th-wangchanberta-"
+
     if use_slem:
-        output_dir = f"models/claq-qa-th-wangchanberta-slem-{exp_name}"
+        output_dir = output_dir + f"slem-{exp_name}"
+    elif use_bleu:
+        output_dir = output_dir + f"bleu-{exp_name}"
     else: 
-        output_dir = f"models/claq-qa-th-wangchanberta-{exp_name}"
+        output_dir = output_dir + f"{exp_name}"
+    
+    tags = []
+    if select_cosine_threshold:
+        tags.append("threshold")
+        tags.append(f"cosine{select_cosine_threshold}")
+    if use_slem:
+        tags.append("slem")
+    elif use_bleu:
+        tags.append("bleu")
+    
 
     training_args = TrainingArguments(
         output_dir=output_dir,
@@ -141,6 +180,7 @@ def get_training_args(exp_name: str, push_to_hub=True, use_slem=False):
         "eval_max_answer_length": 64,
         "squad_v2": False,
         "run_name": exp_name,
+        "tags": None if len(tags) == 0 else tags
     }
 
     return training_args, data_args
@@ -368,9 +408,9 @@ def evaluate_dataset(dataset, trainer, tokenizer, data_args, metric):
     references = [{"id": ex["id"], "answers": {"answer_start": ex["answers"]["answer_start"], "text": ex["answers"]["text"]}} for ex in dataset]
     return metric.compute(predictions=formatted_predictions, references=references)
 
-def train_eval_model(train_set, val_set, test_set, training_args, data_args, use_slem=False):
-    if use_slem:
-        wandb.init(project=data_args["wandb_project"], name=data_args["run_name"], tags=["slem"])
+def train_eval_model(train_set, val_set, test_set, training_args, data_args):
+    if data_args["tags"]:
+        wandb.init(project=data_args["wandb_project"], name=data_args["run_name"], tags=data_args["tags"])
     else:
         wandb.init(project=data_args["wandb_project"], name=data_args["run_name"])
 
@@ -419,8 +459,10 @@ if __name__ == "__main__":
     parser.add_argument("--from_augment_ratio", type=float, default=None, help="Continue from a specific augment ratio")
     parser.add_argument("--warnings", action="store_true", help="Enable warnings")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--dry_run", action="store_true", help="Dry run only")
+    parser.add_argument("--dry-run", action="store_true", help="Dry run only")
     parser.add_argument("--use-slem", action="store_true", help="Use SLEM metric instead")
+    parser.add_argument("--use-bleu", action="store_true", help="Use topk bleu instead of topk cosine for running dataset benchmark")
+    parser.add_argument("--select-cosine-threshold", type=float, help="Select specific cosine threshold for running dataset benchmark")
     args = parser.parse_args()
 
     SEED = int(args.seed)
@@ -439,7 +481,7 @@ if __name__ == "__main__":
             print(f"Continuing from {args.from_augment_idx}")
             all_augment_cols = all_augment_cols[int(args.from_augment_idx):]
             print(f"New augment columns: {all_augment_cols}")
-
+        
         for col in tqdm(all_augment_cols):
             gc.collect()
             if col:
@@ -452,10 +494,18 @@ if __name__ == "__main__":
                             print(f"Skipping {col} {ratio}")
                             continue
 
-                    train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True, use_slem=args.use_slem)
-                    training_args, data_args = get_training_args(f"{col}_{ratio}", use_slem=args.use_slem)
+                    exp_name = f"{col}_{ratio}"
+                    if args.select_cosine_threshold:
+                        exp_name += f"_cosine{args.select_cosine_threshold}"
+                    if args.use_slem:
+                        exp_name += "_slem"
+                    if args.use_bleu:
+                        exp_name += "_bleu"
 
-                    train_eval_model(train_set, val_set, test_set, training_args, data_args, use_slem=args.use_slem)
+                    train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True, use_slem=args.use_slem, use_bleu=args.use_bleu, select_cosine_threshold=args.select_cosine_threshold)
+                    training_args, data_args = get_training_args(exp_name, use_slem=args.use_slem, use_bleu=args.use_bleu, select_cosine_threshold=args.select_cosine_threshold)
+
+                    train_eval_model(train_set, val_set, test_set, training_args, data_args)
 
                     # Delete the model to save memory
                     time.sleep(60) # 60 seconds to allow model to be pushed to remote first
