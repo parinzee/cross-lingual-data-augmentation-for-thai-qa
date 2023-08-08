@@ -17,6 +17,8 @@ from transformers import (AutoModelForQuestionAnswering, AutoTokenizer,
 import argparse
 import os
 from utils import seed_everything, convert_row_to_simple_transformers_format, merge_qas
+import time
+import shutil
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false" # Set to false to prevent deadlock
 
@@ -455,7 +457,15 @@ if __name__ == "__main__":
 
                     train_eval_model(train_set, val_set, test_set, training_args, data_args, use_slem=args.use_slem)
 
+                    # Delete the model to save memory
+                    time.sleep(60) # 60 seconds to allow model to be pushed to remote first
+                    shutil.rmtree(training_args.output_dir)
+
             else:
                 train_set, val_set, test_set = get_ds(return_hf=True)
                 training_args, data_args = get_training_args("original")
                 train_eval_model(train_set, val_set, test_set, training_args, data_args)
+
+                # Delete the model to save memory
+                time.sleep(60) # 60 seconds to allow model to be pushed to remote first
+                shutil.rmtree(training_args.output_dir)
