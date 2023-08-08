@@ -1,16 +1,12 @@
-import random
 import warnings
 import numpy as np
 import pandas as pd
-import torch
 import wandb
-from huggingface_hub import login
+from huggingface_hub import login, delete_repo
 from tqdm.autonotebook import tqdm
-from collections import defaultdict
 from datasets import Dataset
 from sklearn.model_selection import train_test_split
 import ast
-import hashlib
 import pandas as pd
 from datasets import Dataset
 import collections
@@ -20,30 +16,14 @@ from transformers import (AutoModelForQuestionAnswering, AutoTokenizer,
                           DefaultDataCollator, Trainer, TrainingArguments)
 import argparse
 import os
+from utils import seed_everything, convert_row_to_simple_transformers_format, merge_qas
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false" # Set to false to prevent deadlock
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--from_augment_idx", type=str, default=None, help="Continue from a specific augment index")
-parser.add_argument("--from_augment_ratio", type=float, default=None, help="Continue from a specific augment ratio")
-parser.add_argument("--warnings", action="store_true", help="Enable warnings")
-parser.add_argument("--seed", type=int, default=42, help="Random seed")
-args = parser.parse_args()
-
 wandb.login()
+# login()
 
-SEED = int(args.seed)
-
-def seed_everything(seed=42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-seed_everything(SEED)
+SEED = 42 # Gets overwritten by argparse anyway
 
 dataset = pd.read_parquet("questions/data/06_calculate_distance.parquet")
 dataset
@@ -51,54 +31,9 @@ dataset
 # Due to some serialization issues, the dict column must be changed back to a real dictionary instead of a string
 dataset["answers"] = dataset["answers"].apply(ast.literal_eval)
 
-def convert_row_to_simple_transformers_format(row, question_col="question"):
-    # Initialize an empty list to store converted answers
-    converted_answers = []
-
-    # Iterate over each answer and its corresponding start index
-    for i in range(len(row['answers']['text'])):
-        # Create a dictionary for the current answer
-        answer_dict = {
-            'text': row['answers']['text'][i],
-            'answer_start': row['answers']['answer_start'][i],
-        }
-
-        # Add the current answer to the list of converted answers
-        converted_answers.append(answer_dict)
-
-    # Simpletransformers requires that ids be unique
-    # If we augment the questions, the current id scheme would collide
-    # Thus we rehash the id with the current question instead
-    id = hashlib.sha256((row["context"] + row[question_col]).encode("utf-8")).hexdigest()
-
-    # Create a dictionary for the question and answers
-    qas_dict = {
-        'id': id,
-        "is_impossible": False,
-        'question': row[question_col],
-        'answers': converted_answers
-    }
-
-    # Wrap the 'context', 'question', and 'answers' into a 'qas' list
-    # Return the converted example
-    return {'context': row['context'], 'qas': [qas_dict]}
-
 # Add None so that the first benchmark only consists of the original questions
 all_augment_cols = [None] + [col for col in dataset.columns if col.startswith('th_')]
 print("Augment columns:", all_augment_cols)
-
-def merge_qas(data):
-    merged_data = defaultdict(list)
-
-    # Loop over each dictionary in the dataset
-    for item in data:
-        # Add each 'qas' to the list of 'qas' for the same 'context'
-        merged_data[item['context']].extend(item['qas'])
-
-    # Convert the merged_data back into the original format: a list of dictionaries
-    merged_data = [{'context': context, 'qas': qas} for context, qas in merged_data.items()]
-
-    return merged_data
 
 def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
     if not return_hf:
@@ -162,9 +97,9 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
 
         return Dataset.from_pandas(train_set), Dataset.from_pandas(val_set), Dataset.from_pandas(test_set)
 
-def get_training_args(exp_name: str):
+def get_training_args(exp_name: str, push_to_hub=True):
     training_args = TrainingArguments(
-        output_dir=f"claq-qa-th-wangchanberta-{exp_name}",
+        output_dir=f"models/claq-qa-th-wangchanberta-{exp_name}",
         evaluation_strategy="epoch",
         save_strategy="epoch",
         logging_strategy="epoch",
@@ -175,11 +110,12 @@ def get_training_args(exp_name: str):
         num_train_epochs=20,
         warmup_ratio=0.2,
         weight_decay=0.01,
-        push_to_hub=True,
+        push_to_hub=push_to_hub,
         seed=SEED,
-        fp16=True,
+        bf16=True,
         report_to="wandb",
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+        hub_strategy="end"
     )
 
     data_args = {
@@ -434,7 +370,7 @@ def train_eval_model(train_set, val_set, test_set, training_args, data_args):
         model=model,
         args=training_args,
         train_dataset=tokenized_train,
-        eval_dataset=tokenized_train,
+        eval_dataset=tokenized_val,
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
@@ -458,35 +394,53 @@ def train_eval_model(train_set, val_set, test_set, training_args, data_args):
 
     # Cleanup
     wandb.finish()
-    trainer.push_to_hub()
+    del trainer
+    gc.collect()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--from_augment_idx", type=str, default=None, help="Continue from a specific augment index")
+    parser.add_argument("--from_augment_ratio", type=float, default=None, help="Continue from a specific augment ratio")
+    parser.add_argument("--warnings", action="store_true", help="Enable warnings")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--dry_run", action="store_true", help="Dry run only")
+    args = parser.parse_args()
 
-    if not args.warnings:
-        warnings.filterwarnings("ignore")
+    SEED = int(args.seed)
+    print(f"Using seed {SEED}")
+    seed_everything(SEED)
 
-    if args.from_augment_idx:
-        print(f"Continuing from {args.from_augment_idx}")
-        all_augment_cols = all_augment_cols[int(args.from_augment_idx):]
-        print(f"New augment columns: {all_augment_cols}")
+    # Make models/ folder if it doesn't exist
+    if not os.path.exists("models"):
+        os.makedirs("models")
 
-    for col in tqdm(all_augment_cols):
-        gc.collect()
-        if col:
-            for ratio in range(1, 11):
-                ratio = ratio / 10
+    if not args.dry_run:
+        if not args.warnings:
+            warnings.filterwarnings("ignore")
 
-                # Skip if we are continuing from a specific augment index
-                if args.from_augment_idx and all_augment_cols[0] == col and args.from_augment_ratio:
-                    if float(args.from_augment_ratio) > ratio:
-                        print(f"Skipping {col} {ratio}")
-                        continue
+        if args.from_augment_idx:
+            print(f"Continuing from {args.from_augment_idx}")
+            all_augment_cols = all_augment_cols[int(args.from_augment_idx):]
+            print(f"New augment columns: {all_augment_cols}")
 
-                train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True)
-                training_args, data_args = get_training_args(f"{col}_{ratio}")
+        for col in tqdm(all_augment_cols):
+            gc.collect()
+            if col:
+                for ratio in range(1, 11):
+                    ratio = ratio / 10
 
+                    # Skip if we are continuing from a specific augment index
+                    if args.from_augment_idx and all_augment_cols[0] == col and args.from_augment_ratio:
+                        if float(args.from_augment_ratio) > ratio:
+                            print(f"Skipping {col} {ratio}")
+                            continue
+
+                    train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True)
+                    training_args, data_args = get_training_args(f"{col}_{ratio}")
+
+                    train_eval_model(train_set, val_set, test_set, training_args, data_args)
+
+            else:
+                train_set, val_set, test_set = get_ds(return_hf=True)
+                training_args, data_args = get_training_args("original")
                 train_eval_model(train_set, val_set, test_set, training_args, data_args)
-        else:
-            train_set, val_set, test_set = get_ds(return_hf=True)
-            training_args, data_args = get_training_args("original")
-            train_eval_model(train_set, val_set, test_set, training_args, data_args)
