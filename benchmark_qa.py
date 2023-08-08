@@ -128,10 +128,7 @@ def get_training_args(exp_name: str, push_to_hub=True, use_slem=False, use_bleu=
     if use_slem and use_bleu:
         raise ValueError("use_slem and use_bleu cannot both be True.")
     
-    if select_cosine_threshold:
-        output_dir = f"models/claq-qa-th-wangchanberta-cosine{select_cosine_threshold}-"
-    else:
-        output_dir = "models/claq-qa-th-wangchanberta-"
+    output_dir = "models/claq-qa-th-wangchanberta-"
 
     if use_slem:
         output_dir = output_dir + f"slem-{exp_name}"
@@ -494,13 +491,13 @@ if __name__ == "__main__":
                             print(f"Skipping {col} {ratio}")
                             continue
 
-                    exp_name = f"{col}_{ratio}"
+                    exp_name = f"{col}_"
                     if args.select_cosine_threshold:
-                        exp_name += f"_cosine{args.select_cosine_threshold}"
+                        exp_name += f"{args.select_cosine_threshold}-cosine_{ratio}"
                     if args.use_slem:
-                        exp_name += "_slem"
+                        exp_name += f"{ratio}"
                     if args.use_bleu:
-                        exp_name += "_bleu"
+                        exp_name += f"{ratio}"
 
                     train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True, use_slem=args.use_slem, use_bleu=args.use_bleu, select_cosine_threshold=args.select_cosine_threshold)
                     training_args, data_args = get_training_args(exp_name, use_slem=args.use_slem, use_bleu=args.use_bleu, select_cosine_threshold=args.select_cosine_threshold)
