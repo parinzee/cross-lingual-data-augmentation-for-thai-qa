@@ -35,7 +35,7 @@ dataset["answers"] = dataset["answers"].apply(ast.literal_eval)
 all_augment_cols = [None] + [col for col in dataset.columns if col.startswith('th_')]
 print("Augment columns:", all_augment_cols)
 
-def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
+def get_ds(aug_col=None, aug_ratio=0., return_hf=False, use_slem=False):
     if not return_hf:
         # Filter out test_sets
         test_set = dataset[(dataset["source"] == "xquad") | (dataset["source"] == "tydiqa")].apply(convert_row_to_simple_transformers_format, axis=1)
@@ -55,7 +55,10 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
             base_col = "_".join(aug_col.split("_")[1:])
 
             sorted_ds = dataset.copy()
-            sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
+            if use_slem:
+                sorted_ds = sorted_ds.sort_values(f"slem_{base_col}", ascending=False)
+            else:
+                sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
             sorted_ds = sorted_ds[sorted_ds.index.isin(train_set.index)]
             sorted_ds = sorted_ds.iloc[:round(len(sorted_ds) * aug_ratio)]
             sorted_ds["question"] = sorted_ds[aug_col]
@@ -88,7 +91,10 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
             base_col = "_".join(aug_col.split("_")[1:])
 
             sorted_ds = dataset.copy()
-            sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
+            if use_slem:
+                sorted_ds = sorted_ds.sort_values(f"slem_{base_col}", ascending=False)
+            else:
+                sorted_ds = sorted_ds.sort_values(f"dis_{base_col}")
             sorted_ds = sorted_ds[sorted_ds.index.isin(train_set.index)]
             sorted_ds = sorted_ds.iloc[:round(len(sorted_ds) * aug_ratio)]
             sorted_ds["question"] = sorted_ds[aug_col]
@@ -97,9 +103,14 @@ def get_ds(aug_col=None, aug_ratio=0., return_hf=False):
 
         return Dataset.from_pandas(train_set), Dataset.from_pandas(val_set), Dataset.from_pandas(test_set)
 
-def get_training_args(exp_name: str, push_to_hub=True):
+def get_training_args(exp_name: str, push_to_hub=True, use_slem=False):
+    if use_slem:
+        output_dir = f"models/claq-qa-th-wangchanberta-slem-{exp_name}"
+    else: 
+        output_dir = f"models/claq-qa-th-wangchanberta-{exp_name}"
+
     training_args = TrainingArguments(
-        output_dir=f"models/claq-qa-th-wangchanberta-{exp_name}",
+        output_dir=output_dir,
         evaluation_strategy="epoch",
         save_strategy="epoch",
         logging_strategy="epoch",
@@ -355,8 +366,11 @@ def evaluate_dataset(dataset, trainer, tokenizer, data_args, metric):
     references = [{"id": ex["id"], "answers": {"answer_start": ex["answers"]["answer_start"], "text": ex["answers"]["text"]}} for ex in dataset]
     return metric.compute(predictions=formatted_predictions, references=references)
 
-def train_eval_model(train_set, val_set, test_set, training_args, data_args):
-    wandb.init(project=data_args["wandb_project"], name=data_args["run_name"])
+def train_eval_model(train_set, val_set, test_set, training_args, data_args, use_slem=False):
+    if use_slem:
+        wandb.init(project=data_args["wandb_project"], name=data_args["run_name"], tags=["slem"])
+    else:
+        wandb.init(project=data_args["wandb_project"], name=data_args["run_name"])
 
     model = AutoModelForQuestionAnswering.from_pretrained(data_args["model"])
     tokenizer = AutoTokenizer.from_pretrained(data_args["model"])
@@ -404,6 +418,7 @@ if __name__ == "__main__":
     parser.add_argument("--warnings", action="store_true", help="Enable warnings")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--dry_run", action="store_true", help="Dry run only")
+    parser.add_argument("--use-slem", action="store_true", help="Use SLEM metric instead")
     args = parser.parse_args()
 
     SEED = int(args.seed)
@@ -435,10 +450,10 @@ if __name__ == "__main__":
                             print(f"Skipping {col} {ratio}")
                             continue
 
-                    train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True)
-                    training_args, data_args = get_training_args(f"{col}_{ratio}")
+                    train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True, use_slem=args.use_slem)
+                    training_args, data_args = get_training_args(f"{col}_{ratio}", use_slem=args.use_slem)
 
-                    train_eval_model(train_set, val_set, test_set, training_args, data_args)
+                    train_eval_model(train_set, val_set, test_set, training_args, data_args, use_slem=args.use_slem)
 
             else:
                 train_set, val_set, test_set = get_ds(return_hf=True)
