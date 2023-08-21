@@ -452,8 +452,8 @@ def train_eval_model(train_set, val_set, test_set, training_args, data_args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--from_augment_idx", type=str, default=None, help="Continue from a specific augment index")
-    parser.add_argument("--from_augment_ratio", type=float, default=None, help="Continue from a specific augment ratio")
+    parser.add_argument("--from-augment-idx", type=str, default=None, help="Continue from a specific augment index")
+    parser.add_argument("--from-augment-ratio", type=float, default=None, help="Continue from a specific augment ratio")
     parser.add_argument("--warnings", action="store_true", help="Enable warnings")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--dry-run", action="store_true", help="Dry run only")
@@ -493,10 +493,14 @@ if __name__ == "__main__":
 
                     exp_name = f"{col}_"
                     if args.select_cosine_threshold:
-                        exp_name += f"{args.select_cosine_threshold}-cosine_{ratio}"
-                    if args.use_slem:
-                        exp_name += f"{ratio}"
-                    if args.use_bleu:
+                        exp_name += f"{args.select_cosine_threshold}-"
+                        if args.use_bleu:
+                            exp_name += f"bleu_{ratio}"
+                        elif args.use_slem:
+                            exp_name += f"slem_{ratio}"
+                        else:
+                            raise ValueError("Must specify either --use-bleu or --use-slem if --select-cosine-threshold is specified")
+                    else: 
                         exp_name += f"{ratio}"
 
                     train_set, val_set, test_set = get_ds(col, aug_ratio=ratio, return_hf=True, use_slem=args.use_slem, use_bleu=args.use_bleu, select_cosine_threshold=args.select_cosine_threshold)
