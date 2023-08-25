@@ -16,7 +16,7 @@ import nlpaug.augmenter.word as naw
 
 from utils import monitor_memory
 
-dataset = pd.read_csv('data/05_augment_thai_input.csv')
+dataset = pd.read_parquet('data/05_augment_thai_input.parquet')
 dataset
 
 def augment(dataset, aug_fnc, col_name, clean_every=25):
