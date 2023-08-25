@@ -12,9 +12,13 @@ from pythainlp.tokenize import word_tokenize, word_detokenize
 from nltk.tokenize import sent_tokenize
 from random import choice
 
+import nltk
+
 import nlpaug.augmenter.word as naw
 
 from utils import monitor_memory
+
+nltk.download('omw-1.4', quiet=True)
 
 dataset = pd.read_parquet('data/05_augment_thai_input.parquet')
 dataset
@@ -33,16 +37,21 @@ def augment(dataset, aug_fnc, col_name, clean_every=25):
     for idx, row in tqdm(dataset.iterrows(), total=len(dataset), miniters=0):
         if not row['id'] in completed_ids:
             if row['context'][0] not in ['า']:
-                chunks = sent_tokenize(row[""])
-                augmented = aug_fnc(row['question'])
+                chunks = sent_tokenize(row["context"])
+                full_sent = ""
+                for chunk in chunks:
+                    augmented = aug_fnc(chunk)
 
-                # Randomly select one of the augmented sentences
-                sent = choice(augmented)
-                sent = ''.join(sent)
+                    # Randomly select one of the augmented sentences
+                    sent = choice(augmented)
+                    sent = ''.join(sent)
+                    full_sent += sent + ' '
+
                 data.append({
                     'id': row['id'],
-                    col_name: sent,
+                    col_name: full_sent,
                 })
+
                 del sent
                 del augmented
 
@@ -56,7 +65,7 @@ def augment(dataset, aug_fnc, col_name, clean_every=25):
                 # Incomplete questions causes the augmentation libraries to crash
                 data.append({
                     'id': row['id'],
-                    col_name: row['question'],
+                    col_name: row['context'],
                 })
                 pd.DataFrame(data).to_csv(f"data/05_augment_thai_{fname_suffix}.csv", index=False)
 
