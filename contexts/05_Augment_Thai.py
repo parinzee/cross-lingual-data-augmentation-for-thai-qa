@@ -9,6 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 from pythainlp.augment import word2vec, lm
 from pythainlp.tokenize import word_tokenize, word_detokenize
+from nltk.tokenize import sent_tokenize
 from random import choice
 
 import nlpaug.augmenter.word as naw
@@ -31,7 +32,8 @@ def augment(dataset, aug_fnc, col_name, clean_every=25):
 
     for idx, row in tqdm(dataset.iterrows(), total=len(dataset), miniters=0):
         if not row['id'] in completed_ids:
-            if row['question'][0] not in ['า']:
+            if row['context'][0] not in ['า']:
+                chunks = sent_tokenize(row[""])
                 augmented = aug_fnc(row['question'])
 
                 # Randomly select one of the augmented sentences
@@ -78,11 +80,6 @@ if __name__ == "__main__":
     ltw2v = word2vec.LTW2VAug()
     ltw2v_aug = augment(dataset, lambda x: ltw2v.augment(x, n_sent=1), 'th_ltw2v_aug')
 
-    # Thai2Transformers
-    print('Performing Thai2Transformers augmentation...')
-    thai2trans = lm.Thai2transformersAug()
-    thai2trans_aug = augment(dataset, lambda x: thai2trans.augment(x, num_replace_tokens=5), 'th_thai2trans_aug')
-
     # Fast Text Aug
     print('Performing FastText augmentation...')
     if not os.path.exists('cc.th.300.vec'):
@@ -99,7 +96,6 @@ if __name__ == "__main__":
     augmented_data = pd.merge(augmented_data, wordnet_aug, on='id')
     augmented_data = pd.merge(augmented_data, thai2fit_aug, on='id')
     augmented_data = pd.merge(augmented_data, ltw2v_aug, on='id')
-    augmented_data = pd.merge(augmented_data, thai2trans_aug, on='id')
     augmented_data = pd.merge(augmented_data, fasttext_aug,  on='id')
     augmented_data.to_parquet('data/05_augment_thai.parquet', index=False)
     
