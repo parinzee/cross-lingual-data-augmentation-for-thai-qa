@@ -74,7 +74,7 @@ def monitor_memory(threshold):
 cache_whole_texts = {}
 cache_batches = {}
 
-def encode_in_batch(model, texts):
+def encode_in_batch(model, texts, progress=True):
     # cache for whole texts
     texts_tuple = tuple(texts) # since lists can't be dict keys
     if texts_tuple in cache_whole_texts:
@@ -83,16 +83,28 @@ def encode_in_batch(model, texts):
     batch_size = 2048
     all_embeddings = []
 
-    for i in tqdm(range(0, len(texts), batch_size)):
-        batch_texts = texts[i:i+batch_size]
-        # cache for batches
-        batch_tuple = tuple(batch_texts)
-        if batch_tuple in cache_batches:
-            embeddings = cache_batches[batch_tuple]
-        else:
-            embeddings = cache_individual_texts(model, *batch_texts)
-            cache_batches[batch_tuple] = np.asarray(embeddings)
-        all_embeddings.append(embeddings)
+    if progress:
+        for i in tqdm(range(0, len(texts), batch_size)):
+            batch_texts = texts[i:i+batch_size]
+            # cache for batches
+            batch_tuple = tuple(batch_texts)
+            if batch_tuple in cache_batches:
+                embeddings = cache_batches[batch_tuple]
+            else:
+                embeddings = cache_individual_texts(model, *batch_texts)
+                cache_batches[batch_tuple] = np.asarray(embeddings)
+            all_embeddings.append(embeddings)
+    else:
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i+batch_size]
+            # cache for batches
+            batch_tuple = tuple(batch_texts)
+            if batch_tuple in cache_batches:
+                embeddings = cache_batches[batch_tuple]
+            else:
+                embeddings = cache_individual_texts(model, *batch_texts)
+                cache_batches[batch_tuple] = np.asarray(embeddings)
+            all_embeddings.append(embeddings)
     
     all_embeddings = np.concatenate(all_embeddings, axis=0)
 
