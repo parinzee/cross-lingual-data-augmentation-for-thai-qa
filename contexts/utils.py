@@ -9,6 +9,7 @@ import multiprocessing
 from functools import lru_cache
 from tqdm.auto import tqdm
 import numpy as np
+import gc
 
 
 
@@ -80,7 +81,7 @@ def encode_in_batch(model, texts, progress=True):
     if texts_tuple in cache_whole_texts:
         return cache_whole_texts[texts_tuple]
 
-    batch_size = 2048
+    batch_size = 256
     all_embeddings = []
 
     if progress:
@@ -110,6 +111,8 @@ def encode_in_batch(model, texts, progress=True):
 
     # save to whole texts cache
     cache_whole_texts[texts_tuple] = all_embeddings
+
+    gc.collect()
 
     return all_embeddings
 

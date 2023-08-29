@@ -80,7 +80,7 @@ def encode_in_batch(model, texts):
     if texts_tuple in cache_whole_texts:
         return cache_whole_texts[texts_tuple]
 
-    batch_size = 2048
+    batch_size = 128 
     all_embeddings = []
 
     for i in tqdm(range(0, len(texts), batch_size)):
