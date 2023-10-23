@@ -128,3 +128,15 @@ def cache_individual_texts(model, *batch_texts):
     embeddings = model(list(batch_texts))
     return embeddings
     
+def list_to_ordered_set(input_list):
+    seen = set()
+    output_list = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            output_list.append(item)
+    
+    del seen
+            
+    return output_list

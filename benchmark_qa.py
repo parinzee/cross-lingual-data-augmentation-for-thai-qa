@@ -156,7 +156,7 @@ def get_training_args(exp_name: str, push_to_hub=True, use_slem=False, use_bleu=
         per_device_train_batch_size=32,
         per_device_eval_batch_size=128,
         gradient_accumulation_steps=2,
-        num_train_epochs=15,
+        num_train_epochs=10,
         warmup_ratio=0.2,
         weight_decay=0.01,
         push_to_hub=push_to_hub,

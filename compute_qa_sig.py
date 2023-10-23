@@ -61,13 +61,55 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, required=True, help="Path to the model")
+    parser.add_argument("--model", type=str, required=False, help="Path to the model")
     parser.add_argument("--original-model", type=str, required=False, default="parinzee/claq-qa-th-wangchanberta-original", help="Path to the original model")
+    parser.add_argument("--all-best-models", action="store_true", help="Evaluate all best models (must have results in results/mrc_cosine_distance.csv)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
     seed_everything(args.seed)
 
-    p_value, statistic = main(args)
+    if args.all_best_models:
+        # First find the best models
+        data = pd.read_csv("results/mrc_cosine_distance.csv")
+
+        # Function to extract the augmentation type from the name
+        def get_augmentation_type(name):
+            if name == "original":
+                return "original"
+            return name.rsplit("_", 2)[0]
+
+        # Function to extract the augmentation ratio from the name
+        def get_augment_ratio(name):
+            if name == "original":
+                return "N/A" # Not applicable for the original model
+            return name.rsplit("_", 1)[-1]
+
+        # Apply the function to create a new column with the augmentation type
+        data['augmentation_type'] = data['Name'].apply(get_augmentation_type)
+
+        # Find the best performing model for each augmentation type based on the "test_exact_match" metric
+        best_models = data.loc[data.groupby('augmentation_type')['test_exact_match'].idxmax()]
+
+        # Resetting the index
+        best_models.reset_index(drop=True, inplace=True)
+
+        # Apply the functions to create the new columns
+        best_models['augment_ratio'] = best_models['Name'].apply(get_augment_ratio)
+
+        for row in best_models.itertuples():
+            print(f"Augmentation type: {row.augmentation_type}")
+            print(f"Augmentation ratio: {row.augment_ratio}")
+            print(f"Model: {row.Name}")
+            args.model = f"parinzee/claq-qa-th-wangchanberta-{row.Name}"
+            p_value, statistic = main(args)
+            print(f"p-value: {p_value}")
+            print(f"statistic: {statistic}")
+            print("---")
+
+    else:
+        # Assert that the model path is provided
+        assert args.model is not None, "Please provide the path to the model"
+        p_value, statistic = main(args)
     print(f"p-value: {p_value}")
     print(f"statistic: {statistic}")
