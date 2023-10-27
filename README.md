@@ -1,4 +1,4 @@
-# Cross-Lingual Data Augmentation For QA in Low-Resource Languages
+# Cross-Lingual Data Augmentation For Thai QA
 To be presented at GenBench in EMNLP 2023: `PDF Coming Soon`
 
 TLDR: **This paper introduces an innovative data augmentation framework with quality control measures to enhance the robustness of Thai question answering models.**
