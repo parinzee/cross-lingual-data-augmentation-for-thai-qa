@@ -174,4 +174,4 @@ contexts/data/02_backtranslate_english.csv
 contexts/data/03_augment_llm.csv
 contexts/data/04_paraphrase_qcpg.csv
 contexts/data/06_calculate_distance.parquet
-contexts/data/05_augment_thai.parquet
+contexts/data/05_augment_thai.parquett sta
