@@ -1,7 +1,7 @@
 # Cross-Lingual Data Augmentation For Thai QA
 ### Authors: Parinthapat Pengpun, Can Udomcharoenchaikit, Weerayut Buaphet, Peerat Limkonchotiwat
 To be presented at GenBench in EMNLP 2023:
-- ACL Link: *Coming Soon*
+- ACL Link: [PDF](https://aclanthology.org/2023.genbench-1.16/)
 - ResearchGate Link: [PDF](https://www.researchgate.net/publication/374977605_Cross-Lingual_Data_Augmentation_For_Thai_Question-Answering#fullTextFileContent)
 
 TLDR: **This paper introduces an innovative data augmentation framework with quality control measures to enhance the robustness of Thai question answering models.**
